@@ -28,7 +28,7 @@ def init_jinja2(app, **kw):
     )
     path = kw.get('path', None)
     if path is None:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'teplates')
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
     logging.info('set jinja2 template path: %s' % path)
     env = Environment(loader=FileSystemLoader(path), **options)
     filters = kw.get('filters', None)
@@ -67,7 +67,7 @@ async def response_factory(app, handler):
             resp.content_type = 'application/octet-stream'
             return resp
         if isinstance(r, str):
-            if r.startswith('redirect'):
+            if r.startswith('redirect:'):
                 return web.HTTPFound(r[9:])
             resp = web.Response(body=r.encode('utf-8'))
             resp.content_type = 'text/html;charset=utf-8'
