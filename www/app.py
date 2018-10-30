@@ -4,7 +4,7 @@
 __author__ = 'Johnny Chen'
 
 '''
-async web application
+async web application.
 '''
 
 import logging; logging.basicConfig(level=logging.INFO)
@@ -12,10 +12,10 @@ import asyncio, os, json, time
 from datetime import datetime
 from aiohttp import web
 from jinja2 import Environment, FileSystemLoader
-
+from config import configs
 import orm
 from coroweb import add_routes, add_static
-
+from handlers import cookie2user, COOKIE_NAME
 def init_jinja2(app, **kw):
     logging.info('init jinja2...')
     options = dict(
@@ -43,6 +43,21 @@ async def logger_factory(app, handler):
         # await asyncio.sleep(0.3)
         return (await handler(request))
     return logger
+
+async def auth_factory(app, handler):
+    async def auth(request):
+        logging.info('check user: %s %s' % (request.method, request.path))
+        request.__user__ = None
+        cookie_str = request.cookies.get(COOKIE_NAME)
+        if cookie_str:
+            user = await cookie2user(cookie_str)
+            if user:
+                logging.info('set current user: %s' % user.email)
+                request.__user__ = user
+        if request.path.startswith('/manage/') and (request.__user__ is None or not request.__user__.admin):
+            return web.HTTPFound('/signin')
+        return (await handler(request))
+    return auth
 
 async def data_factory(app, handler):
     async def parse_data(request):
@@ -79,11 +94,12 @@ async def response_factory(app, handler):
                 resp.content_type = 'application/json;charset=utf-8'
                 return resp
             else:
+                r['__user__'] = request.__user__
                 resp = web.Response(body=app['__templating__'].get_template(template).render(**r).encode('utf-8'))
                 resp.content_type = 'text/html;charset=utf-8'
                 return resp
-        if isinstance(r, int) and r >= 100 and r < 600:
-            return web.Response(r)
+        if isinstance(r, int) and t >= 100 and t < 600:
+            return web.Response(t)
         if isinstance(r, tuple) and len(r) == 2:
             t, m = r
             if isinstance(t, int) and t >= 100 and t < 600:
@@ -103,13 +119,15 @@ def datetime_filter(t):
     if delta < 86400:
         return u'%s hours before' % (delta // 3600)
     if delta < 604800:
-        return u'%s days before' % (delat // 86400)
+        return u'%s days before' % (delta // 86400)
     dt = datetime.fromtimestamp(t)
     return u'%s Year %s Mon %s Day' % (dt.year, dt.month, dt.day)
     
 async def init(loop):
-    await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='root', password='1q2w3e4R', db='awesome')
-    app = web.Application(loop=loop, middlewares=[logger_factory, response_factory])
+    await orm.create_pool(loop=loop, **configs.db)
+    app = web.Application(loop=loop, middlewares=[
+        logger_factory, auth_factory, response_factory
+    ])
     init_jinja2(app, filters=dict(datetime=datetime_filter))
     add_routes(app, 'handlers')
     add_static(app)
