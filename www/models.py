@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+'''
+Models for user, blog, comment.
+'''
+
+__author__ = 'Johnny Chen'
+
 import time, uuid
 
 from orm import Model, StringField, BooleanField, FloatField, TextField
@@ -38,5 +47,3 @@ class Comment(Model):
     user_image = StringField(ddl='varchar(500)')
     content = TextField()
     created_at = FloatField(default=time.time)
-
-
